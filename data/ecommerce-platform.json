@@ -1,0 +1,244 @@
+{
+  "name": "E-commerce Platform Architecture",
+  "description": "Complete e-commerce platform with microservices, event-driven architecture, and CQRS patterns",
+  "layers": [
+    {
+      "id": "frontend",
+      "name": "Frontend Applications",
+      "color": "#ef4444",
+      "visible": true,
+      "description": "User-facing applications and interfaces"
+    },
+    {
+      "id": "api-gateway",
+      "name": "API Gateway",
+      "color": "#f59e0b",
+      "visible": true,
+      "description": "API management, routing, and security"
+    },
+    {
+      "id": "business-services",
+      "name": "Business Services",
+      "color": "#10b981",
+      "visible": true,
+      "description": "Core business logic microservices"
+    },
+    {
+      "id": "data-services",
+      "name": "Data Services",
+      "color": "#3b82f6",
+      "visible": true,
+      "description": "Data management and persistence"
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure",
+      "color": "#8b5cf6",
+      "visible": true,
+      "description": "Supporting infrastructure services"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "customer-web",
+      "x": -300,
+      "y": -200,
+      "label": "Customer Portal",
+      "layer": "frontend",
+      "icon": "fas fa-shopping-cart",
+      "type": "web-app",
+      "description": "Customer-facing e-commerce website"
+    },
+    {
+      "id": "admin-web",
+      "x": -100,
+      "y": -200,
+      "label": "Admin Dashboard",
+      "layer": "frontend",
+      "icon": "fas fa-chart-bar",
+      "type": "web-app",
+      "description": "Administrative interface for managing the platform"
+    },
+    {
+      "id": "mobile-app",
+      "x": 100,
+      "y": -200,
+      "label": "Mobile App",
+      "layer": "frontend",
+      "icon": "fas fa-mobile-alt",
+      "type": "mobile-app",
+      "description": "iOS and Android mobile applications"
+    },
+    {
+      "id": "partner-api",
+      "x": 300,
+      "y": -200,
+      "label": "Partner API",
+      "layer": "frontend",
+      "icon": "fas fa-handshake",
+      "type": "api",
+      "description": "API for third-party integrations"
+    },
+    {
+      "id": "api-gateway",
+      "x": 0,
+      "y": -100,
+      "label": "Kong Gateway",
+      "layer": "api-gateway",
+      "icon": "fas fa-door-open",
+      "type": "gateway",
+      "description": "API gateway with authentication, rate limiting, and routing"
+    },
+    {
+      "id": "user-service",
+      "x": -250,
+      "y": 0,
+      "label": "User Service",
+      "layer": "business-services",
+      "icon": "fas fa-users",
+      "type": "microservice",
+      "description": "User management and authentication"
+    },
+    {
+      "id": "product-service",
+      "x": -125,
+      "y": 0,
+      "label": "Product Service",
+      "layer": "business-services",
+      "icon": "fas fa-box",
+      "type": "microservice",
+      "description": "Product catalog and inventory management"
+    },
+    {
+      "id": "order-service",
+      "x": 0,
+      "y": 0,
+      "label": "Order Service",
+      "layer": "business-services",
+      "icon": "fas fa-receipt",
+      "type": "microservice",
+      "description": "Order processing and management"
+    },
+    {
+      "id": "payment-service",
+      "x": 125,
+      "y": 0,
+      "label": "Payment Service",
+      "layer": "business-services",
+      "icon": "fas fa-credit-card",
+      "type": "microservice",
+      "description": "Payment processing and billing"
+    },
+    {
+      "id": "notification-service",
+      "x": 250,
+      "y": 0,
+      "label": "Notification Service",
+      "layer": "business-services",
+      "icon": "fas fa-bell",
+      "type": "microservice",
+      "description": "Email, SMS, and push notifications"
+    },
+    {
+      "id": "user-db",
+      "x": -250,
+      "y": 100,
+      "label": "User Database",
+      "layer": "data-services",
+      "icon": "fas fa-database",
+      "type": "postgresql",
+      "description": "PostgreSQL database for user data"
+    },
+    {
+      "id": "product-db",
+      "x": -125,
+      "y": 100,
+      "label": "Product Database",
+      "layer": "data-services",
+      "icon": "fas fa-database",
+      "type": "mongodb",
+      "description": "MongoDB for product catalog"
+    },
+    {
+      "id": "order-db",
+      "x": 0,
+      "y": 100,
+      "label": "Order Database",
+      "layer": "data-services",
+      "icon": "fas fa-database",
+      "type": "postgresql",
+      "description": "PostgreSQL for order data"
+    },
+    {
+      "id": "payment-db",
+      "x": 125,
+      "y": 100,
+      "label": "Payment Database",
+      "layer": "data-services",
+      "icon": "fas fa-database",
+      "type": "postgresql",
+      "description": "PostgreSQL for payment transactions"
+    },
+    {
+      "id": "search-db",
+      "x": 250,
+      "y": 100,
+      "label": "Search Engine",
+      "layer": "data-services",
+      "icon": "fas fa-search",
+      "type": "elasticsearch",
+      "description": "Elasticsearch for product search"
+    },
+    {
+      "id": "message-queue",
+      "x": -150,
+      "y": 200,
+      "label": "Message Queue",
+      "layer": "infrastructure",
+      "icon": "fas fa-stream",
+      "type": "rabbitmq",
+      "description": "RabbitMQ for async messaging"
+    },
+    {
+      "id": "cache",
+      "x": 0,
+      "y": 200,
+      "label": "Redis Cache",
+      "layer": "infrastructure",
+      "icon": "fas fa-memory",
+      "type": "redis",
+      "description": "Redis for caching and sessions"
+    },
+    {
+      "id": "monitoring",
+      "x": 150,
+      "y": 200,
+      "label": "Monitoring",
+      "layer": "infrastructure",
+      "icon": "fas fa-chart-line",
+      "type": "prometheus",
+      "description": "Prometheus and Grafana monitoring"
+    }
+  ],
+  "connections": [
+    { "from": "customer-web", "to": "api-gateway", "label": "HTTPS" },
+    { "from": "admin-web", "to": "api-gateway", "label": "HTTPS" },
+    { "from": "mobile-app", "to": "api-gateway", "label": "HTTPS" },
+    { "from": "partner-api", "to": "api-gateway", "label": "HTTPS" },
+    { "from": "api-gateway", "to": "user-service", "label": "HTTP" },
+    { "from": "api-gateway", "to": "product-service", "label": "HTTP" },
+    { "from": "api-gateway", "to": "order-service", "label": "HTTP" },
+    { "from": "api-gateway", "to": "payment-service", "label": "HTTP" },
+    { "from": "user-service", "to": "user-db", "label": "SQL" },
+    { "from": "product-service", "to": "product-db", "label": "NoSQL" },
+    { "from": "order-service", "to": "order-db", "label": "SQL" },
+    { "from": "payment-service", "to": "payment-db", "label": "SQL" },
+    { "from": "product-service", "to": "search-db", "label": "Index" },
+    { "from": "order-service", "to": "message-queue", "label": "Events" },
+    { "from": "payment-service", "to": "message-queue", "label": "Events" },
+    { "from": "message-queue", "to": "notification-service", "label": "Events" },
+    { "from": "user-service", "to": "cache", "label": "Cache" },
+    { "from": "product-service", "to": "cache", "label": "Cache" },
+    { "from": "order-service", "to": "cache", "label": "Cache" }
+  ]
+}

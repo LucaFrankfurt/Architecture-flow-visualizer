@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture Flow Visualizer</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1><i class="fas fa-sitemap"></i> Architecture Flow Visualizer</h1>
+            </div>
+            <div class="header-right">
+                <button id="theme-toggle" class="btn btn-icon" title="Toggle Theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button id="fullscreen-toggle" class="btn btn-icon" title="Toggle Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-layers"></i> Layers</h3>
+                    <button id="sidebar-toggle" class="btn btn-icon" title="Toggle Sidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
+                
+                <div class="sidebar-content">
+                    <!-- Architecture Templates -->
+                    <div class="section">
+                        <h4>Architecture Templates</h4>
+                        <select id="architecture-select" class="form-control" title="Select Architecture Template">
+                            <option value="">Select Template...</option>
+                            <option value="microservices">Microservices</option>
+                            <option value="layered">Layered Architecture</option>
+                            <option value="event-driven">Event-Driven</option>
+                            <option value="hexagonal">Hexagonal Architecture</option>
+                            <option value="serverless">Serverless Architecture</option>
+                            <option value="cqrs">CQRS + Event Sourcing</option>
+                            <option value="clean-architecture">Clean Architecture</option>
+                        </select>
+                    </div>
+
+                    <!-- Layer Controls -->
+                    <div class="section">
+                        <h4>Layer Controls</h4>
+                        <div class="layer-controls">
+                            <div class="layer-actions">
+                                <button id="show-all-layers" class="btn btn-sm">Show All</button>
+                                <button id="hide-all-layers" class="btn btn-sm">Hide All</button>
+                            </div>
+                            <div id="layers-list" class="layers-list">
+                                <!-- Dynamic layer items will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Code View Info -->
+                    <div class="section">
+                        <h4>Code View</h4>
+                        <div class="code-info">
+                            <p class="text-secondary">Click on nodes with code implementations to view their source code in a modal popup.</p>
+                            <div class="code-stats">
+                                <span id="nodes-with-code">Nodes with code: 0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Canvas Area -->
+            <div class="canvas-container">
+                <div class="canvas-controls">
+                    <div class="zoom-controls">
+                        <button id="zoom-in" class="btn btn-icon" title="Zoom In">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <span id="zoom-level">100%</span>
+                        <button id="zoom-out" class="btn btn-icon" title="Zoom Out">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <button id="zoom-reset" class="btn btn-icon" title="Reset Zoom">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </button>
+                    </div>
+                    <div class="view-controls">
+                        <button id="center-view" class="btn btn-sm" title="Center View">
+                            <i class="fas fa-crosshairs"></i> Center
+                        </button>
+                        <button id="fit-to-screen" class="btn btn-sm" title="Fit to Screen">
+                            <i class="fas fa-expand"></i> Fit
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="canvas-wrapper">
+                    <canvas id="architecture-canvas" width="1200" height="800"></canvas>
+                    <div id="canvas-overlay" class="canvas-overlay"></div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading-indicator" class="loading-indicator">
+                    <div class="spinner"></div>
+                    <p>Loading architecture...</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <span>Architecture Flow Visualizer v1.0</span>
+                <div class="footer-stats">
+                    <span id="node-count">Nodes: 0</span>
+                    <span id="connection-count">Connections: 0</span>
+                    <span id="layer-count">Layers: 0</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Node Detail Modal -->
+    <div id="node-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Node Details</h3>
+                <button id="modal-close" class="btn btn-icon" title="Close Modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code View Modal -->
+    <div id="code-modal" class="modal code-modal">
+        <div class="modal-content code-modal-content">
+            <div class="modal-header code-modal-header">
+                <div class="code-modal-title">
+                    <h3 id="code-modal-title">Code Implementation</h3>
+                    <span id="code-modal-language" class="code-language-badge">JavaScript</span>
+                </div>
+                <div class="code-modal-actions">
+                    <button id="code-copy-btn" class="btn btn-icon" title="Copy Code">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button id="code-fullscreen-btn" class="btn btn-icon" title="Toggle Fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button id="code-modal-close" class="btn btn-icon" title="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body code-modal-body">
+                <div id="code-modal-content" class="code-modal-content-area">
+                    <pre><code id="code-modal-display">// Code will be displayed here</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/canvas-engine.js"></script>
+    <script src="js/layer-manager.js"></script>
+    <script src="js/architecture-data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+{
+  "name": "Banking System Architecture",
+  "description": "Secure banking system with event sourcing, CQRS, and strict compliance requirements",
+  "layers": [
+    {
+      "id": "channels",
+      "name": "Customer Channels",
+      "color": "#ef4444",
+      "visible": true,
+      "description": "Customer-facing channels and interfaces"
+    },
+    {
+      "id": "api-management",
+      "name": "API Management",
+      "color": "#f59e0b",
+      "visible": true,
+      "description": "API gateway and security layer"
+    },
+    {
+      "id": "core-banking",
+      "name": "Core Banking",
+      "color": "#10b981",
+      "visible": true,
+      "description": "Core banking business services"
+    },
+    {
+      "id": "compliance",
+      "name": "Compliance & Risk",
+      "color": "#3b82f6",
+      "visible": true,
+      "description": "Regulatory compliance and risk management"
+    },
+    {
+      "id": "data-platform",
+      "name": "Data Platform",
+      "color": "#8b5cf6",
+      "visible": true,
+      "description": "Data storage and analytics"
+    },
+    {
+      "id": "external",
+      "name": "External Systems",
+      "color": "#ec4899",
+      "visible": true,
+      "description": "Third-party integrations"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "mobile-banking",
+      "x": -200,
+      "y": -250,
+      "label": "Mobile Banking",
+      "layer": "channels",
+      "icon": "fas fa-mobile-alt",
+      "type": "mobile-app",
+      "description": "iOS and Android banking applications",
+      "code": "// Mobile banking app with biometric authentication\nclass BiometricAuth {\n  async authenticate() {\n    const result = await TouchID.authenticate('Access your account');\n    return result.success;\n  }\n}\n\nclass TransactionService {\n  async transferFunds(fromAccount, toAccount, amount) {\n    const isAuthenticated = await this.biometricAuth.authenticate();\n    if (!isAuthenticated) throw new Error('Authentication failed');\n    \n    return await this.apiClient.post('/transfers', {\n      from: fromAccount,\n      to: toAccount, \n      amount: amount\n    });\n  }\n}",
+      "codeLanguage": "javascript"
+    },
+    {
+      "id": "web-banking",
+      "x": 0,
+      "y": -250,
+      "label": "Web Banking",
+      "layer": "channels",
+      "icon": "fas fa-desktop",
+      "type": "web-app",
+      "description": "Secure web banking portal"
+    },
+    {
+      "id": "atm-network",
+      "x": 200,
+      "y": -250,
+      "label": "ATM Network",
+      "layer": "channels",
+      "icon": "fas fa-credit-card",
+      "type": "atm",
+      "description": "Automated teller machine network"
+    },
+    {
+      "id": "api-gateway",
+      "x": 0,
+      "y": -150,
+      "label": "API Gateway",
+      "layer": "api-management",
+      "icon": "fas fa-shield-alt",
+      "type": "gateway",
+      "description": "Secure API gateway with OAuth2 and rate limiting"
+    },
+    {
+      "id": "account-service",
+      "x": -150,
+      "y": -50,
+      "label": "Account Service",
+      "layer": "core-banking",
+      "icon": "fas fa-piggy-bank",
+      "type": "microservice",
+      "description": "Account management and balance operations",
+      "code": "// Account aggregate with event sourcing\nclass Account {\n  constructor(accountId) {\n    this.id = accountId;\n    this.balance = 0;\n    this.status = 'ACTIVE';\n    this.events = [];\n  }\n\n  debit(amount, description) {\n    if (this.balance < amount) {\n      throw new InsufficientFundsError('Insufficient balance');\n    }\n    \n    if (this.status !== 'ACTIVE') {\n      throw new AccountNotActiveError('Account is not active');\n    }\n\n    this.addEvent(new MoneyDebitedEvent({\n      accountId: this.id,\n      amount: amount,\n      description: description,\n      timestamp: new Date()\n    }));\n\n    this.balance -= amount;\n  }\n\n  credit(amount, description) {\n    this.addEvent(new MoneyCreditedEvent({\n      accountId: this.id,\n      amount: amount,\n      description: description,\n      timestamp: new Date()\n    }));\n\n    this.balance += amount;\n  }\n}",
+      "codeLanguage": "javascript"
+    },
+    {
+      "id": "transaction-service",
+      "x": 0,
+      "y": -50,
+      "label": "Transaction Service",
+      "layer": "core-banking",
+      "icon": "fas fa-exchange-alt",
+      "type": "microservice",
+      "description": "Transaction processing with SAGA pattern"
+    },
+    {
+      "id": "card-service",
+      "x": 150,
+      "y": -50,
+      "label": "Card Service",
+      "layer": "core-banking",
+      "icon": "fas fa-credit-card",
+      "type": "microservice",
+      "description": "Credit and debit card management"
+    },
+    {
+      "id": "fraud-detection",
+      "x": -150,
+      "y": 50,
+      "label": "Fraud Detection",
+      "layer": "compliance",
+      "icon": "fas fa-eye",
+      "type": "ml-service",
+      "description": "Real-time fraud detection using machine learning",
+      "code": "# Fraud detection with machine learning\nimport tensorflow as tf\nimport numpy as np\nfrom sklearn.preprocessing import StandardScaler\n\nclass FraudDetectionService:\n    def __init__(self):\n        self.model = tf.keras.models.load_model('fraud_model.h5')\n        self.scaler = StandardScaler()\n        \n    def predict_fraud(self, transaction):\n        features = self.extract_features(transaction)\n        scaled_features = self.scaler.transform([features])\n        \n        fraud_probability = self.model.predict(scaled_features)[0][0]\n        \n        return {\n            'is_fraud': fraud_probability > 0.7,\n            'confidence': fraud_probability,\n            'risk_factors': self.identify_risk_factors(transaction, features)\n        }\n    \n    def extract_features(self, transaction):\n        return [\n            transaction.amount,\n            transaction.merchant_category,\n            transaction.time_since_last_transaction,\n            transaction.location_risk_score,\n            transaction.card_present,\n            transaction.velocity_last_hour\n        ]",
+      "codeLanguage": "python"
+    },
+    {
+      "id": "kyc-service",
+      "x": 0,
+      "y": 50,
+      "label": "KYC Service",
+      "layer": "compliance",
+      "icon": "fas fa-user-check",
+      "type": "microservice",
+      "description": "Know Your Customer compliance service"
+    },
+    {
+      "id": "aml-service",
+      "x": 150,
+      "y": 50,
+      "label": "AML Service",
+      "layer": "compliance",
+      "icon": "fas fa-search-dollar",
+      "type": "microservice",
+      "description": "Anti-Money Laundering monitoring"
+    },
+    {
+      "id": "event-store",
+      "x": -100,
+      "y": 150,
+      "label": "Event Store",
+      "layer": "data-platform",
+      "icon": "fas fa-archive",
+      "type": "eventstore",
+      "description": "Immutable event storage for audit trail"
+    },
+    {
+      "id": "read-models",
+      "x": 0,
+      "y": 150,
+      "label": "Read Models",
+      "layer": "data-platform",
+      "icon": "fas fa-eye",
+      "type": "database",
+      "description": "Optimized read models for queries"
+    },
+    {
+      "id": "analytics-db",
+      "x": 100,
+      "y": 150,
+      "label": "Analytics DB",
+      "layer": "data-platform",
+      "icon": "fas fa-chart-bar",
+      "type": "datawarehouse",
+      "description": "Data warehouse for analytics and reporting"
+    },
+    {
+      "id": "payment-networks",
+      "x": -150,
+      "y": 250,
+      "label": "Payment Networks",
+      "layer": "external",
+      "icon": "fas fa-network-wired",
+      "type": "external",
+      "description": "VISA, MasterCard, and other payment networks"
+    },
+    {
+      "id": "credit-bureau",
+      "x": 0,
+      "y": 250,
+      "label": "Credit Bureau",
+      "layer": "external",
+      "icon": "fas fa-chart-line",
+      "type": "external",
+      "description": "Credit scoring and reporting agencies"
+    },
+    {
+      "id": "regulatory",
+      "x": 150,
+      "y": 250,
+      "label": "Regulatory APIs",
+      "layer": "external",
+      "icon": "fas fa-gavel",
+      "type": "external",
+      "description": "Government and regulatory reporting"
+    }
+  ],
+  "connections": [
+    { "from": "mobile-banking", "to": "api-gateway", "label": "HTTPS/TLS 1.3" },
+    { "from": "web-banking", "to": "api-gateway", "label": "HTTPS/TLS 1.3" },
+    { "from": "atm-network", "to": "api-gateway", "label": "Secure VPN" },
+    { "from": "api-gateway", "to": "account-service", "label": "mTLS" },
+    { "from": "api-gateway", "to": "transaction-service", "label": "mTLS" },
+    { "from": "api-gateway", "to": "card-service", "label": "mTLS" },
+    { "from": "transaction-service", "to": "fraud-detection", "label": "Event Stream" },
+    { "from": "transaction-service", "to": "aml-service", "label": "Event Stream" },
+    { "from": "account-service", "to": "event-store", "label": "Event Sourcing" },
+    { "from": "transaction-service", "to": "event-store", "label": "Event Sourcing" },
+    { "from": "event-store", "to": "read-models", "label": "Projections" },
+    { "from": "event-store", "to": "analytics-db", "label": "ETL" },
+    { "from": "card-service", "to": "payment-networks", "label": "ISO 8583" },
+    { "from": "kyc-service", "to": "credit-bureau", "label": "API" },
+    { "from": "aml-service", "to": "regulatory", "label": "SWIFT/FIX" }
+  ]
+}

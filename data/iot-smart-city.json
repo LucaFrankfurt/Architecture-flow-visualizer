@@ -1,0 +1,265 @@
+{
+  "name": "IoT Smart City Platform",
+  "description": "Internet of Things platform for smart city management with real-time data processing",
+  "layers": [
+    {
+      "id": "devices",
+      "name": "IoT Devices",
+      "color": "#ef4444",
+      "visible": true,
+      "description": "Physical sensors and smart devices"
+    },
+    {
+      "id": "connectivity",
+      "name": "Connectivity Layer",
+      "color": "#f59e0b",
+      "visible": true,
+      "description": "Communication protocols and gateways"
+    },
+    {
+      "id": "ingestion",
+      "name": "Data Ingestion",
+      "color": "#10b981",
+      "visible": true,
+      "description": "Real-time data collection and processing"
+    },
+    {
+      "id": "processing",
+      "name": "Data Processing",
+      "color": "#3b82f6",
+      "visible": true,
+      "description": "Stream processing and analytics"
+    },
+    {
+      "id": "storage",
+      "name": "Data Storage",
+      "color": "#8b5cf6",
+      "visible": true,
+      "description": "Time-series and historical data storage"
+    },
+    {
+      "id": "applications",
+      "name": "Applications",
+      "color": "#ec4899",
+      "visible": true,
+      "description": "Smart city applications and dashboards"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "traffic-sensors",
+      "x": -250,
+      "y": -250,
+      "label": "Traffic Sensors",
+      "layer": "devices",
+      "icon": "fas fa-traffic-light",
+      "type": "sensor",
+      "description": "Vehicle detection and traffic flow sensors"
+    },
+    {
+      "id": "air-quality",
+      "x": -100,
+      "y": -250,
+      "label": "Air Quality",
+      "layer": "devices",
+      "icon": "fas fa-wind",
+      "type": "sensor",
+      "description": "PM2.5, CO2, and pollution monitoring sensors"
+    },
+    {
+      "id": "smart-lights",
+      "x": 50,
+      "y": -250,
+      "label": "Smart Lighting",
+      "layer": "devices",
+      "icon": "fas fa-lightbulb",
+      "type": "actuator",
+      "description": "Adaptive LED street lighting system"
+    },
+    {
+      "id": "noise-sensors",
+      "x": 200,
+      "y": -250,
+      "label": "Noise Sensors",
+      "layer": "devices",
+      "icon": "fas fa-volume-up",
+      "type": "sensor",
+      "description": "Urban noise level monitoring"
+    },
+    {
+      "id": "lorawan-gateway",
+      "x": -150,
+      "y": -150,
+      "label": "LoRaWAN Gateway",
+      "layer": "connectivity",
+      "icon": "fas fa-broadcast-tower",
+      "type": "gateway",
+      "description": "Long-range, low-power wireless gateway"
+    },
+    {
+      "id": "wifi-hotspots",
+      "x": 0,
+      "y": -150,
+      "label": "WiFi Hotspots",
+      "layer": "connectivity",
+      "icon": "fas fa-wifi",
+      "type": "network",
+      "description": "Public WiFi access points"
+    },
+    {
+      "id": "5g-network",
+      "x": 150,
+      "y": -150,
+      "label": "5G Network",
+      "layer": "connectivity",
+      "icon": "fas fa-signal",
+      "type": "network",
+      "description": "5G cellular network infrastructure"
+    },
+    {
+      "id": "mqtt-broker",
+      "x": -100,
+      "y": -50,
+      "label": "MQTT Broker",
+      "layer": "ingestion",
+      "icon": "fas fa-exchange-alt",
+      "type": "messagebroker",
+      "description": "Lightweight messaging for IoT devices",
+      "code": "# MQTT message handler for IoT device data\nimport paho.mqtt.client as mqtt\nimport json\nfrom datetime import datetime\n\nclass IoTDataHandler:\n    def __init__(self, kafka_producer):\n        self.kafka_producer = kafka_producer\n        self.client = mqtt.Client()\n        self.client.on_connect = self.on_connect\n        self.client.on_message = self.on_message\n        \n    def on_connect(self, client, userdata, flags, rc):\n        print(f\"Connected to MQTT broker with result code {rc}\")\n        # Subscribe to all sensor topics\n        client.subscribe(\"sensors/+/data\")\n        client.subscribe(\"actuators/+/status\")\n        \n    def on_message(self, client, userdata, msg):\n        try:\n            # Parse device message\n            topic_parts = msg.topic.split('/')\n            device_type = topic_parts[0]\n            device_id = topic_parts[1]\n            \n            payload = json.loads(msg.payload.decode())\n            \n            # Enrich with metadata\n            enriched_data = {\n                'device_id': device_id,\n                'device_type': device_type,\n                'timestamp': datetime.utcnow().isoformat(),\n                'data': payload,\n                'topic': msg.topic\n            }\n            \n            # Forward to Kafka for stream processing\n            self.kafka_producer.send(\n                'iot-raw-data',\n                value=enriched_data\n            )\n            \n        except Exception as e:\n            print(f\"Error processing message: {e}\")",
+      "codeLanguage": "python"
+    },
+    {
+      "id": "api-gateway",
+      "x": 100,
+      "y": -50,
+      "label": "IoT API Gateway",
+      "layer": "ingestion",
+      "icon": "fas fa-door-open",
+      "type": "gateway",
+      "description": "Device registration and data ingestion API"
+    },
+    {
+      "id": "kafka-streams",
+      "x": -150,
+      "y": 50,
+      "label": "Kafka Streams",
+      "layer": "processing",
+      "icon": "fas fa-stream",
+      "type": "streaming",
+      "description": "Real-time stream processing platform",
+      "code": "// Kafka Streams topology for IoT data processing\nconst { KafkaStreams } = require('kafka-streams');\n\nclass IoTStreamProcessor {\n  constructor() {\n    this.stream = new KafkaStreams({\n      kafkaHost: 'localhost:9092',\n      groupId: 'iot-processor',\n      clientName: 'iot-stream-processor'\n    });\n  }\n\n  async start() {\n    const sourceStream = this.stream.getKStream('iot-raw-data');\n    \n    // Process traffic sensor data\n    const trafficStream = sourceStream\n      .filter(message => message.device_type === 'traffic')\n      .map(message => {\n        const data = message.data;\n        return {\n          device_id: message.device_id,\n          timestamp: message.timestamp,\n          vehicle_count: data.vehicle_count,\n          avg_speed: data.average_speed,\n          congestion_level: this.calculateCongestion(data)\n        };\n      });\n    \n    // Aggregate traffic data by location\n    const trafficAggregated = trafficStream\n      .groupByKey()\n      .window(60000) // 1-minute windows\n      .aggregate(\n        () => ({ total_vehicles: 0, total_speed: 0, count: 0 }),\n        (oldVal, newVal) => ({\n          total_vehicles: oldVal.total_vehicles + newVal.vehicle_count,\n          total_speed: oldVal.total_speed + newVal.avg_speed,\n          count: oldVal.count + 1\n        })\n      );\n    \n    // Detect anomalies in air quality\n    const airQualityAlerts = sourceStream\n      .filter(message => message.device_type === 'air_quality')\n      .filter(message => {\n        const pm25 = message.data.pm25;\n        return pm25 > 35; // WHO guideline threshold\n      })\n      .map(message => ({\n        alert_type: 'HIGH_POLLUTION',\n        device_id: message.device_id,\n        pm25_level: message.data.pm25,\n        timestamp: message.timestamp,\n        severity: message.data.pm25 > 55 ? 'CRITICAL' : 'WARNING'\n      }));\n    \n    // Output streams\n    trafficAggregated.to('traffic-aggregated');\n    airQualityAlerts.to('environmental-alerts');\n    \n    await this.stream.start();\n  }\n  \n  calculateCongestion(data) {\n    const ratio = data.vehicle_count / data.average_speed;\n    if (ratio > 2) return 'HIGH';\n    if (ratio > 1) return 'MEDIUM';\n    return 'LOW';\n  }\n}",
+      "codeLanguage": "javascript"
+    },
+    {
+      "id": "spark-analytics",
+      "x": 0,
+      "y": 50,
+      "label": "Spark Analytics",
+      "layer": "processing",
+      "icon": "fas fa-fire",
+      "type": "analytics",
+      "description": "Large-scale data analytics and ML"
+    },
+    {
+      "id": "ml-pipeline",
+      "x": 150,
+      "y": 50,
+      "label": "ML Pipeline",
+      "layer": "processing",
+      "icon": "fas fa-brain",
+      "type": "ml",
+      "description": "Machine learning for predictive analytics"
+    },
+    {
+      "id": "timeseries-db",
+      "x": -150,
+      "y": 150,
+      "label": "InfluxDB",
+      "layer": "storage",
+      "icon": "fas fa-database",
+      "type": "timeseries",
+      "description": "Time-series database for sensor data"
+    },
+    {
+      "id": "data-lake",
+      "x": 0,
+      "y": 150,
+      "label": "Data Lake",
+      "layer": "storage",
+      "icon": "fas fa-cloud",
+      "type": "storage",
+      "description": "Distributed storage for historical data"
+    },
+    {
+      "id": "graph-db",
+      "x": 150,
+      "y": 150,
+      "label": "Neo4j",
+      "layer": "storage",
+      "icon": "fas fa-project-diagram",
+      "type": "graph",
+      "description": "Graph database for device relationships"
+    },
+    {
+      "id": "traffic-control",
+      "x": -200,
+      "y": 250,
+      "label": "Traffic Control",
+      "layer": "applications",
+      "icon": "fas fa-traffic-light",
+      "type": "application",
+      "description": "Intelligent traffic management system"
+    },
+    {
+      "id": "environmental",
+      "x": -50,
+      "y": 250,
+      "label": "Environmental Monitor",
+      "layer": "applications",
+      "icon": "fas fa-leaf",
+      "type": "application",
+      "description": "Air quality and environmental monitoring"
+    },
+    {
+      "id": "energy-management",
+      "x": 100,
+      "y": 250,
+      "label": "Energy Management",
+      "layer": "applications",
+      "icon": "fas fa-bolt",
+      "type": "application",
+      "description": "Smart grid and energy optimization"
+    },
+    {
+      "id": "citizen-app",
+      "x": 250,
+      "y": 250,
+      "label": "Citizen Portal",
+      "layer": "applications",
+      "icon": "fas fa-users",
+      "type": "mobile-app",
+      "description": "Public access to city services and data"
+    }
+  ],
+  "connections": [
+    { "from": "traffic-sensors", "to": "lorawan-gateway", "label": "LoRa" },
+    { "from": "air-quality", "to": "lorawan-gateway", "label": "LoRa" },
+    { "from": "smart-lights", "to": "wifi-hotspots", "label": "WiFi" },
+    { "from": "noise-sensors", "to": "5g-network", "label": "5G" },
+    { "from": "lorawan-gateway", "to": "mqtt-broker", "label": "MQTT" },
+    { "from": "wifi-hotspots", "to": "api-gateway", "label": "HTTP" },
+    { "from": "5g-network", "to": "api-gateway", "label": "HTTP" },
+    { "from": "mqtt-broker", "to": "kafka-streams", "label": "Kafka" },
+    { "from": "api-gateway", "to": "kafka-streams", "label": "Kafka" },
+    { "from": "kafka-streams", "to": "spark-analytics", "label": "Stream" },
+    { "from": "kafka-streams", "to": "ml-pipeline", "label": "Stream" },
+    { "from": "kafka-streams", "to": "timeseries-db", "label": "Store" },
+    { "from": "spark-analytics", "to": "data-lake", "label": "Batch" },
+    { "from": "ml-pipeline", "to": "graph-db", "label": "Model" },
+    { "from": "timeseries-db", "to": "traffic-control", "label": "Query" },
+    { "from": "timeseries-db", "to": "environmental", "label": "Query" },
+    { "from": "data-lake", "to": "energy-management", "label": "Analytics" },
+    { "from": "graph-db", "to": "citizen-app", "label": "API" },
+    { "from": "traffic-control", "to": "smart-lights", "label": "Control" }
+  ]
+}
