@@ -8,6 +8,7 @@ class CanvasEngine {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.pixelRatio = Utils.getPixelRatio();
+        this.app = null; // Reference to main app for checking states like connection mode
         
         // Configuration
         this.config = {
@@ -26,6 +27,8 @@ class CanvasEngine {
         this.layers = new Map();
         this.selectedNode = null;
         this.hoveredNode = null;
+        this.selectedConnection = null;
+        this.hoveredConnection = null;
         
         // Highlighting state
         this.highlightedNode = null;
@@ -45,9 +48,14 @@ class CanvasEngine {
         this.isDragging = false;
         this.dragStart = null;
         this.lastMousePos = null;
+        this.dragThreshold = 5; // Minimum pixels to consider as drag
+        this.hasDragged = false; // Track if actual dragging occurred
         
         this.setupCanvas();
         this.bindEvents();
+        
+        // Initial render
+        this.render();
     }
     
     setupCanvas() {
@@ -101,10 +109,12 @@ class CanvasEngine {
             this.selectedNode = node;
             this.dragStart = mousePos;
             this.isDragging = false;
+            this.hasDragged = false; // Reset drag tracking
         } else {
             this.selectedNode = null;
             this.dragStart = mousePos;
             this.isDragging = true;
+            this.hasDragged = false; // Reset drag tracking
         }
         
         this.lastMousePos = mousePos;
@@ -117,6 +127,16 @@ class CanvasEngine {
         if (this.dragStart) {
             const dx = mousePos.x - this.lastMousePos.x;
             const dy = mousePos.y - this.lastMousePos.y;
+            
+            // Check if we've moved enough to consider this a drag
+            const totalMovement = Math.sqrt(
+                Math.pow(mousePos.x - this.dragStart.x, 2) + 
+                Math.pow(mousePos.y - this.dragStart.y, 2)
+            );
+            
+            if (totalMovement > this.dragThreshold) {
+                this.hasDragged = true;
+            }
             
             if (this.selectedNode && !this.isDragging) {
                 // Drag node
@@ -172,11 +192,31 @@ class CanvasEngine {
     }
     
     handleClick(e) {
+        // Only handle clicks if we haven't dragged significantly
+        if (this.hasDragged) {
+            return; // Don't trigger click after drag
+        }
+        
         const mousePos = this.getMousePosition(e);
         const node = this.getNodeAtPosition(mousePos);
         
         if (node) {
+            this.selectedConnection = null; // Clear connection selection
             this.onNodeClick?.(node);
+        } else {
+            // Check for connection click if no node was clicked
+            const connection = this.getConnectionAtPosition(mousePos);
+            if (connection) {
+                this.selectedNode = null; // Clear node selection
+                this.selectedConnection = connection;
+                this.onConnectionClick?.(connection);
+                this.render(); // Re-render to show selection
+            } else {
+                // Clear all selections if clicking empty space
+                this.selectedNode = null;
+                this.selectedConnection = null;
+                this.render();
+            }
         }
     }
     
@@ -246,6 +286,61 @@ class CanvasEngine {
         return null;
     }
     
+    getConnectionAtPosition(screenPos) {
+        const worldPos = this.screenToWorld(screenPos);
+        const tolerance = 8; // Click tolerance in pixels
+        
+        for (const connection of this.connections) {
+            const fromNode = this.nodes.get(connection.from);
+            const toNode = this.nodes.get(connection.to);
+            
+            if (!fromNode || !toNode) continue;
+            if (!this.isLayerVisible(fromNode.layer) || !this.isLayerVisible(toNode.layer)) continue;
+            
+            // Calculate connection line
+            const fromCenter = { x: fromNode.x, y: fromNode.y };
+            const toCenter = { x: toNode.x, y: toNode.y };
+            
+            // Check if click is near the line between nodes
+            const distance = this.pointToLineDistance(worldPos, fromCenter, toCenter);
+            if (distance <= tolerance) {
+                return connection;
+            }
+        }
+        
+        return null;
+    }
+    
+    pointToLineDistance(point, lineStart, lineEnd) {
+        const A = point.x - lineStart.x;
+        const B = point.y - lineStart.y;
+        const C = lineEnd.x - lineStart.x;
+        const D = lineEnd.y - lineStart.y;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        if (lenSq === 0) return Math.sqrt(A * A + B * B);
+        
+        let param = dot / lenSq;
+        
+        let xx, yy;
+        if (param < 0) {
+            xx = lineStart.x;
+            yy = lineStart.y;
+        } else if (param > 1) {
+            xx = lineEnd.x;
+            yy = lineEnd.y;
+        } else {
+            xx = lineStart.x + param * C;
+            yy = lineStart.y + param * D;
+        }
+        
+        const dx = point.x - xx;
+        const dy = point.y - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
     // Layer management
     addLayer(layerId, layerInfo) {
         this.layers.set(layerId, {
@@ -266,27 +361,42 @@ class CanvasEngine {
         return false;
     }
     
-    isLayerVisible(layerId) {
-        const layer = this.layers.get(layerId);
-        return layer ? layer.visible : true;
+    // Utility method to lighten colors
+    lightenColor(color, factor) {
+        // Convert hex to RGB
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        
+        // Lighten by mixing with white
+        const newR = Math.round(r + (255 - r) * factor);
+        const newG = Math.round(g + (255 - g) * factor);
+        const newB = Math.round(b + (255 - b) * factor);
+        
+        return `rgb(${newR}, ${newG}, ${newB})`;
     }
     
-    // Node management
-    addNode(node) {
-        const nodeId = node.id || Utils.generateId();
-        const nodeData = {
-            id: nodeId,
-            x: node.x || 0,
-            y: node.y || 0,
-            label: node.label || 'Node',
-            layer: node.layer || 'default',
-            type: node.type || 'default',
-            data: node.data || {},
-            ...node
-        };
-        
-        this.nodes.set(nodeId, nodeData);
-        return nodeData;
+    // Utility method to draw rounded rectangles
+    drawRoundedRect(x, y, width, height, radius) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + radius, y);
+        this.ctx.lineTo(x + width - radius, y);
+        this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        this.ctx.lineTo(x + width, y + height - radius);
+        this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        this.ctx.lineTo(x + radius, y + height);
+        this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        this.ctx.lineTo(x, y + radius);
+        this.ctx.quadraticCurveTo(x, y, x + radius, y);
+        this.ctx.closePath();
+    }
+    
+    isLayerVisible(layerId) {
+        const layer = this.layers.get(layerId);
+        // If layer doesn't exist or layers Map is empty, default to visible
+        if (!layer && this.layers.size === 0) return true;
+        return layer ? layer.visible : true;
     }
     
     removeNode(nodeId) {
@@ -298,17 +408,50 @@ class CanvasEngine {
     }
     
     addConnection(connection) {
-        const conn = {
-            id: connection.id || Utils.generateId(),
-            from: connection.from,
-            to: connection.to,
-            label: connection.label || '',
-            type: connection.type || 'default',
-            ...connection
-        };
+        // Handle different connection formats
+        let conn;
+        if (typeof connection === 'object' && connection.from && connection.to) {
+            // Object format from templates
+            conn = {
+                id: connection.id || Utils.generateId(),
+                from: connection.from,
+                to: connection.to,
+                label: connection.label || '',
+                type: connection.type || 'default',
+                ...connection
+            };
+        } else {
+            console.error('Invalid connection format:', connection);
+            return null;
+        }
         
         this.connections.push(conn);
         return conn;
+    }
+    
+    removeConnection(fromId, toId) {
+        const initialLength = this.connections.length;
+        this.connections = this.connections.filter(conn => 
+            !(conn.from === fromId && conn.to === toId) &&
+            !(conn.from === toId && conn.to === fromId) // Also remove reverse connections
+        );
+        return this.connections.length < initialLength; // Return true if connection was removed
+    }
+    
+    updateConnection(connectionId, updates) {
+        const connection = this.connections.find(conn => conn.id === connectionId);
+        if (connection) {
+            Object.assign(connection, updates);
+            return connection;
+        }
+        return null;
+    }
+    
+    findConnection(fromId, toId) {
+        return this.connections.find(conn => 
+            (conn.from === fromId && conn.to === toId) ||
+            (conn.from === toId && conn.to === fromId)
+        );
     }
     
     // Rendering methods
@@ -341,7 +484,9 @@ class CanvasEngine {
     
     renderNodes() {
         for (const node of this.nodes.values()) {
-            if (!this.isLayerVisible(node.layer)) continue;
+            if (!this.isLayerVisible(node.layer)) {
+                continue;
+            }
             
             this.renderNode(node);
         }
@@ -350,65 +495,37 @@ class CanvasEngine {
     renderNode(node) {
         const { x, y } = node;
         const { width, height } = this.config.nodeSize;
-        const layer = this.layers.get(node.layer);
-        const isSelected = this.selectedNode === node;
-        const isHovered = this.hoveredNode === node;
-        const isHighlighted = this.highlightedNodes.includes(node) || this.highlightedNode === node;
         
         this.ctx.save();
         
-        // Dim non-highlighted nodes when highlighting is active
-        if (this.highlightedNodes.length > 0 && !isHighlighted) {
-            this.ctx.globalAlpha = 0.3;
-        }
+        // Get layer info for colors
+        const layer = this.layers.get(node.layer);
+        const layerColor = layer?.color || '#3b82f6';
         
-        // Node background
-        const style = getComputedStyle(document.documentElement);
-        this.ctx.fillStyle = style.getPropertyValue('--node-bg').trim();
-        this.ctx.strokeStyle = layer?.color || style.getPropertyValue('--node-border').trim();
-        this.ctx.lineWidth = (isSelected || isHighlighted) ? this.config.selectionWidth : 1;
+        // Node background with layer color (lighter)
+        this.ctx.fillStyle = this.lightenColor(layerColor, 0.9);
+        this.ctx.strokeStyle = layerColor;
+        this.ctx.lineWidth = 2;
         
-        // Add glow effect for hovered/selected/highlighted nodes
-        if (isHovered || isSelected || isHighlighted) {
-            this.ctx.shadowColor = layer?.color || '#3b82f6';
-            this.ctx.shadowBlur = isHighlighted ? 15 : 10;
-            this.ctx.shadowOffsetX = 0;
-            this.ctx.shadowOffsetY = 0;
-        }
-        
-        // Draw node rectangle
-        this.ctx.beginPath();
-        this.ctx.roundRect(x - width/2, y - height/2, width, height, 8);
+        // Draw node rectangle with rounded corners
+        const radius = 8;
+        this.drawRoundedRect(x - width/2, y - height/2, width, height, radius);
         this.ctx.fill();
         this.ctx.stroke();
         
-        // Reset shadow
-        this.ctx.shadowBlur = 0;
-        
-        // Node icon (if specified)
-        if (node.icon) {
-            this.ctx.fillStyle = layer?.color || '#3b82f6';
-            this.ctx.font = '16px "Font Awesome 6 Free"';
-            this.ctx.fillText(node.icon, x, y - 10);
-        }
-        
         // Node label
-        this.ctx.fillStyle = style.getPropertyValue('--text-primary').trim();
-        this.ctx.font = `${this.config.fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+        this.ctx.fillStyle = '#1f2937';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(node.label || 'Node', x, y + 5);
         
-        // Multi-line text support
-        const lines = node.label.split('\n');
-        const lineHeight = this.config.fontSize + 2;
-        const startY = y + (node.icon ? 5 : -(lines.length - 1) * lineHeight / 2);
-        
-        lines.forEach((line, index) => {
-            this.ctx.fillText(line, x, startY + index * lineHeight);
-        });
-        
-        // Node type indicator
-        if (node.type && node.type !== 'default') {
-            this.ctx.fillStyle = Utils.colorWithOpacity(layer?.color || '#3b82f6', 0.2);
-            this.ctx.fillRect(x - width/2, y - height/2, width, 4);
+        // Icon area (simplified - just a colored circle for now)
+        if (node.icon) {
+            this.ctx.fillStyle = layerColor;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y - 15, 8, 0, 2 * Math.PI);
+            this.ctx.fill();
         }
         
         this.ctx.restore();
@@ -428,6 +545,8 @@ class CanvasEngine {
         if (!this.isLayerVisible(fromNode.layer) || !this.isLayerVisible(toNode.layer)) return;
         
         const isHighlighted = this.highlightedConnections.includes(connection);
+        const isSelected = this.selectedConnection === connection;
+        const isHovered = this.hoveredConnection === connection;
         
         this.ctx.save();
         
@@ -436,13 +555,27 @@ class CanvasEngine {
             this.ctx.globalAlpha = 0.3;
         }
         
-        const style = getComputedStyle(document.documentElement);
-        this.ctx.strokeStyle = isHighlighted ? '#ff6b35' : style.getPropertyValue('--connection-color').trim();
-        this.ctx.lineWidth = isHighlighted ? this.config.connectionWidth * 2 : this.config.connectionWidth;
+        // Determine connection styling
+        let strokeColor = '#6b7280'; // Default gray
+        let lineWidth = this.config.connectionWidth;
         
-        // Add glow effect for highlighted connections
-        if (isHighlighted) {
-            this.ctx.shadowColor = '#ff6b35';
+        if (isSelected) {
+            strokeColor = '#3b82f6'; // Blue for selected
+            lineWidth = this.config.connectionWidth * 2;
+        } else if (isHighlighted) {
+            strokeColor = '#ff6b35'; // Orange for highlighted
+            lineWidth = this.config.connectionWidth * 2;
+        } else if (isHovered) {
+            strokeColor = '#8b5cf6'; // Purple for hovered
+            lineWidth = this.config.connectionWidth * 1.5;
+        }
+        
+        this.ctx.strokeStyle = strokeColor;
+        this.ctx.lineWidth = lineWidth;
+        
+        // Add glow effect for special states
+        if (isSelected || isHighlighted || isHovered) {
+            this.ctx.shadowColor = strokeColor;
             this.ctx.shadowBlur = 8;
             this.ctx.shadowOffsetX = 0;
             this.ctx.shadowOffsetY = 0;
@@ -506,10 +639,41 @@ class CanvasEngine {
                 y: (fromPoint.y + toPoint.y) / 2
             };
             
-            this.ctx.fillStyle = style.getPropertyValue('--text-secondary').trim();
-            this.ctx.font = `${this.config.fontSize - 2}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+            // Reset shadow for text
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
+            
+            // Text styling
+            this.ctx.font = `bold ${this.config.fontSize - 1}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(connection.label, midPoint.x, midPoint.y - 8);
+            this.ctx.textBaseline = 'middle';
+            
+            // Measure text for background
+            const textMetrics = this.ctx.measureText(connection.label);
+            const textWidth = textMetrics.width;
+            const textHeight = this.config.fontSize + 2;
+            const padding = 4;
+            
+            // Draw background rectangle
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            this.ctx.strokeStyle = strokeColor;
+            this.ctx.lineWidth = 1;
+            
+            const bgRect = {
+                x: midPoint.x - textWidth/2 - padding,
+                y: midPoint.y - textHeight/2 - padding/2,
+                width: textWidth + padding * 2,
+                height: textHeight + padding
+            };
+            
+            this.ctx.beginPath();
+            this.drawRoundedRect(bgRect.x, bgRect.y, bgRect.width, bgRect.height, 3);
+            this.ctx.fill();
+            this.ctx.stroke();
+            
+            // Draw text
+            this.ctx.fillStyle = '#1f2937';
+            this.ctx.fillText(connection.label, midPoint.x, midPoint.y);
         }
         
         this.ctx.restore();
@@ -561,6 +725,11 @@ class CanvasEngine {
         }
         
         this.render();
+        
+        // Center the viewport to show the nodes
+        setTimeout(() => {
+            this.zoomToFit();
+        }, 100);
     }
     
     zoomToFit() {
@@ -628,6 +797,52 @@ class CanvasEngine {
             connections: this.connections.length,
             layers: this.layers.size
         };
+    }
+    
+    // Node Management
+    addNode(nodeData) {
+        const nodeId = nodeData.id || Utils.generateId();
+        const node = {
+            id: nodeId,
+            x: nodeData.x || 0,
+            y: nodeData.y || 0,
+            label: nodeData.label || 'Node',
+            layer: nodeData.layer || 'default',
+            type: nodeData.type || 'default',
+            data: nodeData.data || {},
+            ...nodeData
+        };
+        
+        this.nodes.set(nodeId, node);
+        return node;
+    }
+    
+    removeNode(nodeId) {
+        // Remove node
+        this.nodes.delete(nodeId);
+        
+        // Remove all connections to/from this node
+        this.connections = this.connections.filter(conn => 
+            conn.from !== nodeId && conn.to !== nodeId
+        );
+        
+        // Clear selection if selected node was removed
+        if (this.selectedNode && this.selectedNode.id === nodeId) {
+            this.selectedNode = null;
+        }
+    }
+    
+    // Utility Methods
+    clearAll() {
+        this.nodes.clear();
+        this.connections = [];
+        this.selectedNode = null;
+        this.hoveredNode = null;
+        this.clearHighlights();
+    }
+    
+    getNodeAtId(nodeId) {
+        return this.nodes.get(nodeId);
     }
     
     // Highlighting methods

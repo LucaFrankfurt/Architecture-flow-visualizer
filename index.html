@@ -75,6 +75,43 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Node Management -->
+                    <div class="section">
+                        <h4>Node Management</h4>
+                        <div class="node-management">
+                            <button id="add-node-btn" class="btn btn-primary btn-full">
+                                <i class="fas fa-plus"></i> Add Node
+                            </button>
+                            <button id="connection-mode-btn" class="btn btn-secondary btn-full">
+                                <i class="fas fa-link"></i> Connection Mode
+                            </button>
+                            <div class="management-actions">
+                                <button id="auto-layout-btn" class="btn btn-sm">
+                                    <i class="fas fa-magic"></i> Auto Layout
+                                </button>
+                                <button id="clear-all-btn" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>Import/Export</h4>
+                        <div class="import-export">
+                            <button id="export-json-btn" class="btn btn-primary btn-full">
+                                <i class="fas fa-download"></i> Export JSON
+                            </button>
+                            <button id="import-json-btn" class="btn btn-secondary btn-full">
+                                <i class="fas fa-upload"></i> Import JSON
+                            </button>
+                            <button id="export-image-btn" class="btn btn-secondary btn-full">
+                                <i class="fas fa-image"></i> Export Image
+                            </button>
+                            <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                        </div>
+                    </div>
                 </div>
             </aside>
 
@@ -168,6 +205,210 @@
                 <div id="code-modal-content" class="code-modal-content-area">
                     <pre><code id="code-modal-display">// Code will be displayed here</code></pre>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Node Creation Modal -->
+    <div id="node-creation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="node-creation-title">Add New Node</h3>
+                <button id="node-creation-close" class="btn btn-icon" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="node-creation-form" class="node-form">
+                    <div class="form-group">
+                        <label for="node-label">Node Label *</label>
+                        <input type="text" id="node-label" class="form-control" placeholder="e.g. API Gateway" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="node-type">Type</label>
+                            <select id="node-type" class="form-control">
+                                <option value="service">Service</option>
+                                <option value="database">Database</option>
+                                <option value="api">API</option>
+                                <option value="gateway">Gateway</option>
+                                <option value="cache">Cache</option>
+                                <option value="queue">Queue</option>
+                                <option value="storage">Storage</option>
+                                <option value="external">External</option>
+                                <option value="ui">User Interface</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="node-layer">Layer</label>
+                            <select id="node-layer" class="form-control">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="node-icon">Icon</label>
+                        <div class="icon-selector">
+                            <input type="text" id="node-icon" class="form-control" placeholder="fas fa-server" value="fas fa-cube">
+                            <div class="icon-preview">
+                                <i id="icon-preview" class="fas fa-cube"></i>
+                            </div>
+                        </div>
+                        <div class="icon-suggestions">
+                            <button type="button" class="icon-btn" data-icon="fas fa-server"><i class="fas fa-server"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-database"><i class="fas fa-database"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-cloud"><i class="fas fa-cloud"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-cog"><i class="fas fa-cog"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-shield-alt"><i class="fas fa-shield-alt"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-mobile-alt"><i class="fas fa-mobile-alt"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="node-description">Description</label>
+                        <textarea id="node-description" class="form-control" rows="3" placeholder="Brief description of this component..."></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="cancel-node" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Node</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Node Modal -->
+    <div id="edit-node-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Node</h3>
+                <button type="button" class="btn btn-icon" onclick="this.closest('.modal').style.display='none'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-node-form">
+                    <input type="hidden" id="edit-node-id">
+                    
+                    <div class="form-group">
+                        <label for="edit-node-label">Node Label *</label>
+                        <input type="text" id="edit-node-label" class="form-control" required placeholder="Enter node label...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-node-type">Node Type</label>
+                        <select id="edit-node-type" class="form-control">
+                            <option value="default">Default</option>
+                            <option value="service">Service</option>
+                            <option value="database">Database</option>
+                            <option value="api">API</option>
+                            <option value="ui">UI Component</option>
+                            <option value="external">External System</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-node-layer">Layer</label>
+                        <select id="edit-node-layer" class="form-control">
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Icon</label>
+                        <div id="edit-icon-selector" class="icon-selector">
+                            <button type="button" class="icon-btn active" data-icon="">
+                                <i class="fas fa-cube"></i> Default
+                            </button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-server"><i class="fas fa-server"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-database"><i class="fas fa-database"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-cloud"><i class="fas fa-cloud"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-cog"><i class="fas fa-cog"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-globe"><i class="fas fa-globe"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-lock"><i class="fas fa-lock"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-shield-alt"><i class="fas fa-shield-alt"></i></button>
+                            <button type="button" class="icon-btn" data-icon="fas fa-mobile-alt"><i class="fas fa-mobile-alt"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-node-description">Description</label>
+                        <textarea id="edit-node-description" class="form-control" rows="3" placeholder="Brief description of this component..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-node-code">Code Implementation</label>
+                        <textarea id="edit-node-code" class="form-control" rows="6" placeholder="Optional code snippet..." style="font-family: 'Courier New', monospace;"></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="cancel-edit-node" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Node</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Edit Modal -->
+    <div id="connection-edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="connection-edit-title">Edit Connection</h3>
+                <button id="connection-edit-close" class="btn btn-icon" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="connection-edit-form" class="connection-form">
+                    <div class="form-group">
+                        <label for="connection-from">From Node</label>
+                        <input type="text" id="connection-from" class="form-control" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="connection-to">To Node</label>
+                        <input type="text" id="connection-to" class="form-control" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="connection-label">Connection Label</label>
+                        <input type="text" id="connection-label" class="form-control" placeholder="e.g. HTTP Request, Database Query, Event">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="connection-type">Connection Type</label>
+                        <select id="connection-type" class="form-control">
+                            <option value="default">Default</option>
+                            <option value="sync">Synchronous</option>
+                            <option value="async">Asynchronous</option>
+                            <option value="event">Event</option>
+                            <option value="data">Data Flow</option>
+                            <option value="api">API Call</option>
+                            <option value="message">Message</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="connection-description">Description</label>
+                        <textarea id="connection-description" class="form-control" rows="3" placeholder="Describe this connection..."></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="delete-connection" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Delete Connection
+                        </button>
+                        <div class="form-actions-right">
+                            <button type="button" id="cancel-edit-connection" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Update Connection</button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

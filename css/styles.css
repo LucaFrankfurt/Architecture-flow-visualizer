@@ -324,29 +324,163 @@ body {
     border-radius: 0;
 }
 
-/* Responsive code modal */
-@media (max-width: 768px) {
-    .code-modal-content {
-        width: 95vw;
-        height: 90vh;
+/* Node Creation Form */
+.node-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-control {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-control::placeholder {
+    color: var(--text-secondary);
+}
+
+label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+/* Icon Selector */
+.icon-selector {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.icon-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background-color: var(--surface-color);
+    font-size: 1.2rem;
+    color: var(--primary-color);
+}
+
+.icon-suggestions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background-color: var(--surface-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.icon-btn.selected {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Connection Mode Styles */
+.connection-mode-indicator {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background-color: #059669;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 1000;
+    display: none;
+}
+
+.connection-mode-indicator.show {
+    display: block;
+}
+
+/* Node Creation Position Indicator */
+.node-position-indicator {
+    position: absolute;
+    width: 140px;
+    height: 90px;
+    border: 2px dashed var(--primary-color);
+    border-radius: 8px;
+    background-color: rgba(59, 130, 246, 0.1);
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+}
+
+.node-position-indicator.show {
+    display: block;
+    
+    /* Responsive form styles */
+    .form-row {
+        grid-template-columns: 1fr;
     }
     
-    .code-modal-header {
-        padding: 1rem;
+    .management-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
         flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
     }
     
-    .code-modal-title {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-    
-    .code-modal-content-area pre {
-        font-size: 0.8rem;
-        padding: 1rem;
+    .icon-suggestions {
+        justify-content: center;
     }
 }
 
@@ -818,6 +952,59 @@ body {
     display: flex;
 }
 
+/* Node Management Section */
+.node-management {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.btn-full {
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    background-color: #2563eb;
+}
+
+.btn-secondary {
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background-color: var(--border-color);
+}
+
+.btn-danger {
+    background-color: #dc2626;
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #b91c1c;
+}
+
+.management-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.connection-mode-active {
+    background-color: #059669 !important;
+    color: white !important;
+}
+
 /* Enhanced Layer Details Modal Styles */
 .layer-details-modal {
     max-width: 500px;
@@ -1018,4 +1205,29 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
+}
+
+/* Connection Form Styles */
+.connection-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-actions-right {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+/* Connection highlighting */
+.connection-selected {
+    stroke-width: 4px !important;
+    stroke: #3b82f6 !important;
+    filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
+}
+
+.connection-hover {
+    stroke-width: 3px !important;
+    cursor: pointer;
 }

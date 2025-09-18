@@ -11,6 +11,20 @@ class ArchitectureApp {
         this.currentTheme = 'light';
         this.sidebarCollapsed = false;
         
+        // Node management state
+        this.connectionMode = false;
+        this.selectedNodeForConnection = null;
+        this.nextNodeId = 1000; // Start from 1000 to avoid conflicts
+        
+        // Copy/paste state
+        this.nodeClipboard = null;
+        this.lastClickedNode = null;
+        
+        // Command history for undo/redo
+        this.commandHistory = [];
+        this.historyIndex = -1;
+        this.maxHistorySize = 50;
+        
         this.init();
     }
     
@@ -52,9 +66,13 @@ class ArchitectureApp {
             padding: 30
         });
         
+        // Set app reference for state checking
+        this.canvasEngine.app = this;
+        
         // Bind canvas events
         this.canvasEngine.onZoomChange = (zoom) => this.updateZoomDisplay(zoom);
         this.canvasEngine.onNodeClick = (node) => this.handleNodeClick(node);
+        this.canvasEngine.onConnectionClick = (connection) => this.handleConnectionClick(connection);
     }
     
     setupLayerManager() {
@@ -139,6 +157,9 @@ class ArchitectureApp {
                     case 'highlight-connections':
                         this.highlightConnections(nodeId);
                         break;
+                    case 'edit-node':
+                        this.showEditNodeModal(nodeId);
+                        break;
                     case 'view-code':
                         this.showCodeForNodeById(nodeId);
                         break;
@@ -167,6 +188,104 @@ class ArchitectureApp {
         if (codeFullscreenBtn) {
             codeFullscreenBtn.addEventListener('click', () => this.toggleCodeFullscreen());
         }
+        
+        // Node management controls
+        const addNodeBtn = document.getElementById('add-node-btn');
+        const connectionModeBtn = document.getElementById('connection-mode-btn');
+        const autoLayoutBtn = document.getElementById('auto-layout-btn');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+        
+        if (addNodeBtn) {
+            addNodeBtn.addEventListener('click', () => this.showNodeCreationModal());
+        }
+        
+        if (connectionModeBtn) {
+            connectionModeBtn.addEventListener('click', () => this.toggleConnectionMode());
+        }
+        
+        if (autoLayoutBtn) {
+            autoLayoutBtn.addEventListener('click', () => this.autoLayoutNodes());
+        }
+        
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => this.clearAllNodes());
+        }
+        
+        // Import/Export controls
+        const exportJsonBtn = document.getElementById('export-json-btn');
+        const importJsonBtn = document.getElementById('import-json-btn');
+        const exportImageBtn = document.getElementById('export-image-btn');
+        const importFileInput = document.getElementById('import-file-input');
+        
+        if (exportJsonBtn) {
+            exportJsonBtn.addEventListener('click', () => this.exportDiagramAsJSON());
+        }
+        
+        if (importJsonBtn) {
+            importJsonBtn.addEventListener('click', () => this.triggerImportJSON());
+        }
+        
+        if (exportImageBtn) {
+            exportImageBtn.addEventListener('click', () => this.exportDiagramAsImage());
+        }
+        
+        if (importFileInput) {
+            importFileInput.addEventListener('change', (e) => this.handleImportJSON(e));
+        }
+        
+        // Node creation modal
+        const nodeCreationClose = document.getElementById('node-creation-close');
+        const nodeCreationForm = document.getElementById('node-creation-form');
+        const cancelNodeBtn = document.getElementById('cancel-node');
+        
+        if (nodeCreationClose) {
+            nodeCreationClose.addEventListener('click', () => this.hideNodeCreationModal());
+        }
+        
+        if (cancelNodeBtn) {
+            cancelNodeBtn.addEventListener('click', () => this.hideNodeCreationModal());
+        }
+        
+        if (nodeCreationForm) {
+            nodeCreationForm.addEventListener('submit', (e) => this.handleNodeCreation(e));
+        }
+        
+        // Connection edit modal
+        const connectionEditClose = document.getElementById('connection-edit-close');
+        const connectionEditForm = document.getElementById('connection-edit-form');
+        const cancelEditConnectionBtn = document.getElementById('cancel-edit-connection');
+        const deleteConnectionBtn = document.getElementById('delete-connection');
+        
+        if (connectionEditClose) {
+            connectionEditClose.addEventListener('click', () => this.hideConnectionEditModal());
+        }
+        
+        if (cancelEditConnectionBtn) {
+            cancelEditConnectionBtn.addEventListener('click', () => this.hideConnectionEditModal());
+        }
+        
+        if (deleteConnectionBtn) {
+            deleteConnectionBtn.addEventListener('click', () => this.handleDeleteConnection());
+        }
+        
+        if (connectionEditForm) {
+            connectionEditForm.addEventListener('submit', (e) => this.handleConnectionEdit(e));
+        }
+        
+        // Edit node modal
+        const editNodeForm = document.getElementById('edit-node-form');
+        const cancelEditNodeBtn = document.getElementById('cancel-edit-node');
+        
+        if (editNodeForm) {
+            editNodeForm.addEventListener('submit', (e) => this.handleNodeEdit(e));
+        }
+        
+        if (cancelEditNodeBtn) {
+            cancelEditNodeBtn.addEventListener('click', () => this.hideEditNodeModal());
+        }
+        
+        // Icon selector
+        this.setupIconSelector();
         
         // Window resize
         window.addEventListener('resize', Utils.debounce(() => {
@@ -269,8 +388,45 @@ class ArchitectureApp {
                     
                 case 'c':
                     if (e.ctrlKey || e.metaKey) {
+                        if (e.shiftKey) {
+                            // Copy node (Ctrl+Shift+C)
+                            e.preventDefault();
+                            this.copySelectedNode();
+                        } else {
+                            // Center view (Ctrl+C)
+                            e.preventDefault();
+                            this.centerView();
+                        }
+                    }
+                    break;
+                    
+                case 'v':
+                    if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+                        // Paste node (Ctrl+Shift+V)
                         e.preventDefault();
-                        this.centerView();
+                        this.pasteNode();
+                    }
+                    break;
+                    
+                case 'z':
+                    if (e.ctrlKey || e.metaKey) {
+                        if (e.shiftKey) {
+                            // Redo (Ctrl+Shift+Z)
+                            e.preventDefault();
+                            this.redo();
+                        } else {
+                            // Undo (Ctrl+Z)
+                            e.preventDefault();
+                            this.undo();
+                        }
+                    }
+                    break;
+                    
+                case 'y':
+                    if (e.ctrlKey || e.metaKey) {
+                        // Redo (Ctrl+Y)
+                        e.preventDefault();
+                        this.redo();
                     }
                     break;
                     
@@ -469,8 +625,75 @@ class ArchitectureApp {
     
     // Node interaction
     handleNodeClick(node) {
-        this.showNodeDetails(node);
-        this.showCodeForNode(node);
+        // Track last clicked node for copy/paste
+        this.lastClickedNode = node;
+        
+        // Handle connection mode
+        if (this.connectionMode) {
+            if (!this.selectedNodeForConnection) {
+                // First node selected
+                this.selectedNodeForConnection = node;
+                // Visual feedback - highlight selected node
+                if (this.canvasEngine) {
+                    this.canvasEngine.selectedNode = node;
+                    this.canvasEngine.render();
+                }
+                
+                // Update indicator
+                const indicator = document.getElementById('connection-mode-indicator');
+                if (indicator) {
+                    indicator.innerHTML = `<i class="fas fa-link"></i> Connection Mode: Click target node to connect with "${node.label}"`;
+                }
+            } else if (this.selectedNodeForConnection.id !== node.id) {
+                // Second node selected - create connection
+                const command = this.createAddConnectionCommand(
+                    this.selectedNodeForConnection.id, 
+                    node.id
+                );
+                
+                // Check if connection already exists before executing
+                const connectionExists = this.canvasEngine.connections.some(conn => 
+                    (conn.from === this.selectedNodeForConnection.id && conn.to === node.id) ||
+                    (conn.from === node.id && conn.to === this.selectedNodeForConnection.id)
+                );
+                
+                if (!connectionExists) {
+                    this.executeCommand(command);
+                    console.log(`Connected ${this.selectedNodeForConnection.label} → ${node.label}`);
+                    this.canvasEngine.render();
+                } else {
+                    alert('Connection already exists between these nodes.');
+                }
+                
+                // Reset selection
+                this.selectedNodeForConnection = null;
+                if (this.canvasEngine) {
+                    this.canvasEngine.selectedNode = null;
+                    this.canvasEngine.render();
+                }
+                
+                // Reset indicator
+                const indicator = document.getElementById('connection-mode-indicator');
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fas fa-link"></i> Connection Mode: Click two nodes to connect';
+                }
+            } else {
+                // Same node clicked - deselect
+                this.selectedNodeForConnection = null;
+                if (this.canvasEngine) {
+                    this.canvasEngine.selectedNode = null;
+                    this.canvasEngine.render();
+                }
+                
+                const indicator = document.getElementById('connection-mode-indicator');
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fas fa-link"></i> Connection Mode: Click two nodes to connect';
+                }
+            }
+        } else {
+            // Normal mode - show node details
+            this.showNodeDetails(node);
+        }
     }
     
     showNodeDetails(node) {
@@ -507,12 +730,15 @@ class ArchitectureApp {
                     </div>
                 ` : ''}
                 
-                                <div class="node-actions">
+                <div class="node-actions">
                     <button class="btn node-action-btn" data-action="focus" data-node-id="${node.id}">
                         <i class="fas fa-crosshairs"></i> Focus
                     </button>
                     <button class="btn node-action-btn" data-action="highlight-connections" data-node-id="${node.id}">
                         <i class="fas fa-project-diagram"></i> Show Connections
+                    </button>
+                    <button class="btn node-action-btn" data-action="edit-node" data-node-id="${node.id}">
+                        <i class="fas fa-edit"></i> Edit Node
                     </button>
                     ${node.code ? `
                         <button class="btn node-action-btn" data-action="view-code" data-node-id="${node.id}">
@@ -539,6 +765,124 @@ class ArchitectureApp {
         `;
         
         this.showModal(`Node: ${node.label}`, modalContent);
+    }
+    
+    handleConnectionClick(connection) {
+        if (this.connectionMode) {
+            // Don't show edit modal in connection mode
+            return;
+        }
+        
+        this.showConnectionEditModal(connection);
+    }
+    
+    showConnectionEditModal(connection) {
+        const modal = document.getElementById('connection-edit-modal');
+        const form = document.getElementById('connection-edit-form');
+        
+        if (!modal || !form || !this.canvasEngine) return;
+        
+        // Get node labels for display
+        const fromNode = this.canvasEngine.nodes.get(connection.from);
+        const toNode = this.canvasEngine.nodes.get(connection.to);
+        
+        if (!fromNode || !toNode) return;
+        
+        // Populate form
+        document.getElementById('connection-from').value = fromNode.label;
+        document.getElementById('connection-to').value = toNode.label;
+        document.getElementById('connection-label').value = connection.label || '';
+        document.getElementById('connection-type').value = connection.type || 'default';
+        document.getElementById('connection-description').value = connection.description || '';
+        
+        // Store reference to current connection
+        this.currentEditingConnection = connection;
+        
+        // Show modal
+        modal.classList.add('show');
+    }
+    
+    hideConnectionEditModal() {
+        const modal = document.getElementById('connection-edit-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        this.currentEditingConnection = null;
+    }
+    
+    handleConnectionEdit(e) {
+        e.preventDefault();
+        
+        if (!this.currentEditingConnection || !this.canvasEngine) return;
+        
+        const formData = new FormData(e.target);
+        const updates = {
+            label: document.getElementById('connection-label').value,
+            type: document.getElementById('connection-type').value,
+            description: document.getElementById('connection-description').value
+        };
+        
+        // Create command for undo/redo
+        const command = this.createUpdateConnectionCommand(this.currentEditingConnection.id, updates);
+        this.executeCommand(command);
+        
+        this.hideConnectionEditModal();
+        this.canvasEngine.render();
+    }
+    
+    handleDeleteConnection() {
+        if (!this.currentEditingConnection || !this.canvasEngine) return;
+        
+        if (confirm('Are you sure you want to delete this connection?')) {
+            // Create command for undo/redo
+            const command = this.createDeleteConnectionCommand(this.currentEditingConnection);
+            this.executeCommand(command);
+            
+            this.hideConnectionEditModal();
+            this.canvasEngine.selectedConnection = null;
+            this.canvasEngine.render();
+        }
+    }
+    
+    createUpdateConnectionCommand(connectionId, updates) {
+        const connection = this.canvasEngine.connections.find(conn => conn.id === connectionId);
+        if (!connection) return null;
+        
+        const oldData = { ...connection };
+        
+        return {
+            name: `Update Connection: ${connection.from} → ${connection.to}`,
+            execute: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.updateConnection(connectionId, updates);
+                }
+            },
+            undo: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.updateConnection(connectionId, {
+                        label: oldData.label,
+                        type: oldData.type,
+                        description: oldData.description
+                    });
+                }
+            }
+        };
+    }
+    
+    createDeleteConnectionCommand(connection) {
+        return {
+            name: `Delete Connection: ${connection.from} → ${connection.to}`,
+            execute: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.removeConnection(connection.from, connection.to);
+                }
+            },
+            undo: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.addConnection(connection);
+                }
+            }
+        };
     }
     
     showCodeForNodeById(nodeId) {
@@ -784,7 +1128,6 @@ class ArchitectureApp {
         
         // Simulate loading with animation
         setTimeout(() => {
-            console.log(`Loading architecture template: ${templateName}`);
             const templateData = ArchitectureData.getTemplate(templateName);
             
             if (templateData) {
@@ -887,6 +1230,736 @@ class ArchitectureApp {
                 this.applyTheme();
             }
         }
+    }
+    
+    // Node Creation and Management
+    showNodeCreationModal() {
+        const modal = document.getElementById('node-creation-modal');
+        const layerSelect = document.getElementById('node-layer');
+        
+        // Populate layer options
+        if (layerSelect && this.layerManager) {
+            layerSelect.innerHTML = '';
+            const layers = this.layerManager.getLayerData();
+            layers.forEach(layer => {
+                const option = document.createElement('option');
+                option.value = layer.id;
+                option.textContent = layer.name;
+                layerSelect.appendChild(option);
+            });
+        }
+        
+        // Reset form
+        const form = document.getElementById('node-creation-form');
+        if (form) {
+            form.reset();
+            document.getElementById('node-icon').value = 'fas fa-cube';
+            // Icon preview will be handled by the icon selector
+        }
+        
+        if (modal) {
+            modal.classList.add('show');
+        }
+    }
+    
+    hideNodeCreationModal() {
+        const modal = document.getElementById('node-creation-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+    
+    handleNodeCreation(e) {
+        e.preventDefault();
+        
+        const nodeData = {
+            id: `node-${this.nextNodeId++}`,
+            label: document.getElementById('node-label').value,
+            type: document.getElementById('node-type').value,
+            layer: document.getElementById('node-layer').value,
+            icon: document.getElementById('node-icon').value,
+            description: document.getElementById('node-description').value,
+            x: 0, // Will be positioned in center
+            y: 0,
+            code: '', // Can be added later through edit
+            codeLanguage: 'javascript'
+        };
+        
+        // Position new node in center of viewport
+        if (this.canvasEngine) {
+            const canvas = this.canvasEngine.canvas;
+            const viewport = this.canvasEngine.viewport;
+            nodeData.x = (-viewport.x + canvas.clientWidth / 2) / viewport.zoom;
+            nodeData.y = (-viewport.y + canvas.clientHeight / 2) / viewport.zoom;
+        }
+        
+        this.createNode(nodeData);
+        this.hideNodeCreationModal();
+    }
+    
+    createNode(nodeData) {
+        const command = this.createAddNodeCommand(nodeData);
+        if (command) {
+            this.executeCommand(command);
+            this.canvasEngine?.render();
+            console.log('Created node:', nodeData);
+        }
+    }
+    
+    setupIconSelector() {
+        // Setup for create modal
+        const createIconBtns = document.querySelectorAll('#icon-selector .icon-btn');
+        createIconBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const icon = btn.dataset.icon;
+                
+                // Update selected state for create modal
+                createIconBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+        
+        // Setup for edit modal
+        const editIconBtns = document.querySelectorAll('#edit-icon-selector .icon-btn');
+        editIconBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const icon = btn.dataset.icon;
+                
+                // Update selected state for edit modal
+                editIconBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+    }
+    
+    // Connection Management
+    toggleConnectionMode() {
+        this.connectionMode = !this.connectionMode;
+        const btn = document.getElementById('connection-mode-btn');
+        const indicator = this.getOrCreateConnectionIndicator();
+        
+        if (btn) {
+            btn.classList.toggle('connection-mode-active', this.connectionMode);
+            btn.innerHTML = this.connectionMode ? 
+                '<i class="fas fa-times"></i> Exit Connection Mode' : 
+                '<i class="fas fa-link"></i> Connection Mode';
+        }
+        
+        if (indicator) {
+            indicator.classList.toggle('show', this.connectionMode);
+        }
+        
+        // Reset selection when exiting
+        if (!this.connectionMode) {
+            this.selectedNodeForConnection = null;
+        }
+        
+        // Update canvas cursor
+        if (this.canvasEngine) {
+            this.canvasEngine.canvas.style.cursor = this.connectionMode ? 'crosshair' : 'grab';
+        }
+    }
+    
+    getOrCreateConnectionIndicator() {
+        let indicator = document.getElementById('connection-mode-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'connection-mode-indicator';
+            indicator.className = 'connection-mode-indicator';
+            indicator.innerHTML = '<i class="fas fa-link"></i> Connection Mode: Click two nodes to connect';
+            document.body.appendChild(indicator);
+        }
+        return indicator;
+    }
+    
+    // Utility Methods
+    autoLayoutNodes() {
+        if (!this.canvasEngine) return;
+        
+        const nodes = Array.from(this.canvasEngine.nodes.values());
+        const layers = this.layerManager?.getLayerData() || [];
+        
+        // Group nodes by layer
+        const nodesByLayer = {};
+        layers.forEach(layer => {
+            nodesByLayer[layer.id] = nodes.filter(node => node.layer === layer.id);
+        });
+        
+        // Layout nodes in a grid per layer
+        let currentY = -300;
+        const layerSpacing = 200;
+        const nodeSpacing = 180;
+        
+        Object.keys(nodesByLayer).forEach(layerId => {
+            const layerNodes = nodesByLayer[layerId];
+            if (layerNodes.length === 0) return;
+            
+            const nodesPerRow = Math.ceil(Math.sqrt(layerNodes.length));
+            const totalWidth = (nodesPerRow - 1) * nodeSpacing;
+            const startX = -totalWidth / 2;
+            
+            layerNodes.forEach((node, index) => {
+                const row = Math.floor(index / nodesPerRow);
+                const col = index % nodesPerRow;
+                
+                node.x = startX + col * nodeSpacing;
+                node.y = currentY + row * nodeSpacing;
+            });
+            
+            const rows = Math.ceil(layerNodes.length / nodesPerRow);
+            currentY += (rows - 1) * nodeSpacing + layerSpacing;
+        });
+        
+        this.canvasEngine.render();
+        
+        // Fit to screen after layout
+        setTimeout(() => {
+            this.canvasEngine.zoomToFit();
+        }, 100);
+    }
+    
+    clearAllNodes() {
+        if (!confirm('Are you sure you want to clear all nodes? This action cannot be undone.')) {
+            return;
+        }
+        
+        if (this.canvasEngine) {
+            this.canvasEngine.clearAll();
+            this.canvasEngine.render();
+            
+            if (this.layerManager) {
+                this.layerManager.updateStats();
+            }
+        }
+    }
+    
+    // Import/Export Methods
+    exportDiagramAsJSON() {
+        if (!this.canvasEngine) {
+            alert('No diagram to export.');
+            return;
+        }
+        
+        const diagramData = {
+            version: '1.0.0',
+            timestamp: new Date().toISOString(),
+            nodes: Array.from(this.canvasEngine.nodes.values()),
+            connections: Array.from(this.canvasEngine.connections.values()),
+            layers: this.layerManager ? this.layerManager.getLayerData() : [],
+            viewport: this.canvasEngine.viewport ? { ...this.canvasEngine.viewport } : null
+        };
+        
+        const dataStr = JSON.stringify(diagramData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `architecture-diagram-${new Date().toISOString().split('T')[0]}.json`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        this.showToast('Diagram exported successfully');
+        console.log('Diagram exported:', diagramData);
+    }
+    
+    triggerImportJSON() {
+        const fileInput = document.getElementById('import-file-input');
+        if (fileInput) {
+            fileInput.click();
+        }
+    }
+    
+    handleImportJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const diagramData = JSON.parse(e.target.result);
+                this.importDiagram(diagramData);
+                this.showToast('Diagram imported successfully');
+            } catch (error) {
+                console.error('Error importing diagram:', error);
+                alert('Error importing diagram. Please check the file format.');
+            }
+        };
+        
+        reader.readAsText(file);
+        
+        // Reset the input so the same file can be selected again
+        event.target.value = '';
+    }
+    
+    importDiagram(diagramData) {
+        if (!this.canvasEngine) {
+            console.error('Canvas engine not available for import');
+            return;
+        }
+        
+        // Clear existing diagram
+        this.canvasEngine.clearAll();
+        
+        // Import nodes
+        if (diagramData.nodes && Array.isArray(diagramData.nodes)) {
+            diagramData.nodes.forEach(nodeData => {
+                this.canvasEngine.addNode(nodeData);
+            });
+        }
+        
+        // Import connections
+        if (diagramData.connections && Array.isArray(diagramData.connections)) {
+            diagramData.connections.forEach(connData => {
+                this.canvasEngine.addConnection(connData.from, connData.to);
+            });
+        }
+        
+        // Import layers (if available) - for now, just note that layers exist
+        if (diagramData.layers && Array.isArray(diagramData.layers)) {
+            console.log('Imported diagram contains layer data:', diagramData.layers);
+            // Layer import could be enhanced in the future
+        }
+        
+        // Restore viewport (if available)
+        if (diagramData.viewport && this.canvasEngine.viewport) {
+            Object.assign(this.canvasEngine.viewport, diagramData.viewport);
+        }
+        
+        // Re-render and update stats
+        this.canvasEngine.render();
+        if (this.layerManager) {
+            this.layerManager.updateStats();
+        }
+        
+        // Clear command history since we're starting fresh
+        this.commandHistory = [];
+        this.historyIndex = -1;
+        
+        console.log('Diagram imported successfully:', diagramData);
+    }
+    
+    exportDiagramAsImage() {
+        if (!this.canvasEngine) {
+            alert('No diagram to export.');
+            return;
+        }
+        
+        const canvas = this.canvasEngine.canvas;
+        
+        // Create a temporary canvas with white background
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Fill with white background
+        tempCtx.fillStyle = '#ffffff';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Draw the current canvas content on top
+        tempCtx.drawImage(canvas, 0, 0);
+        
+        // Create download link
+        tempCanvas.toBlob((blob) => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `architecture-diagram-${new Date().toISOString().split('T')[0]}.png`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            this.showToast('Image exported successfully');
+        }, 'image/png', 1.0);
+    }
+    
+    // Copy/Paste functionality
+    copySelectedNode() {
+        // For now, we'll copy the last clicked node
+        // In the future, this could be enhanced to support multiple selection
+        const selectedNode = this.lastClickedNode;
+        
+        if (!selectedNode) {
+            // Try to find a node that's currently highlighted or selected
+            if (this.canvasEngine && this.canvasEngine.selectedNode) {
+                this.nodeClipboard = { ...this.canvasEngine.selectedNode };
+            } else {
+                alert('No node selected. Click on a node first, then copy.');
+                return;
+            }
+        } else {
+            this.nodeClipboard = { ...selectedNode };
+        }
+        
+        console.log('Node copied to clipboard:', this.nodeClipboard.label);
+        
+        // Visual feedback
+        this.showToast(`Copied "${this.nodeClipboard.label}" to clipboard`);
+    }
+    
+    pasteNode() {
+        if (!this.nodeClipboard) {
+            alert('Nothing to paste. Copy a node first.');
+            return;
+        }
+        
+        // Create a new node with copied data
+        const newNodeData = {
+            ...this.nodeClipboard,
+            id: this.generateNodeId(),
+            label: `${this.nodeClipboard.label} (Copy)`,
+            x: this.nodeClipboard.x + 150, // Offset to avoid overlap
+            y: this.nodeClipboard.y + 50
+        };
+        
+        // Position near center if possible
+        if (this.canvasEngine) {
+            const canvas = this.canvasEngine.canvas;
+            const viewport = this.canvasEngine.viewport;
+            newNodeData.x = (-viewport.x + canvas.clientWidth / 2) / viewport.zoom + Math.random() * 100 - 50;
+            newNodeData.y = (-viewport.y + canvas.clientHeight / 2) / viewport.zoom + Math.random() * 100 - 50;
+        }
+        
+        // Use command system for undo/redo support
+        const command = this.createAddNodeCommand(newNodeData);
+        this.executeCommand(command);
+        this.canvasEngine?.render();
+        
+        console.log('Node pasted:', newNodeData.label);
+        this.showToast(`Pasted "${newNodeData.label}"`);
+    }
+    
+    generateNodeId() {
+        return `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    showToast(message, duration = 3000) {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--accent-color, #3b82f6);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            z-index: 10000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        }, 10);
+        
+        // Remove after duration
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, duration);
+    }
+    
+    // Command System for Undo/Redo
+    executeCommand(command) {
+        // Execute the command
+        command.execute();
+        
+        // Add to history (remove any commands after current index)
+        this.commandHistory = this.commandHistory.slice(0, this.historyIndex + 1);
+        this.commandHistory.push(command);
+        
+        // Maintain max history size
+        if (this.commandHistory.length > this.maxHistorySize) {
+            this.commandHistory = this.commandHistory.slice(-this.maxHistorySize);
+        }
+        
+        this.historyIndex = this.commandHistory.length - 1;
+        
+        console.log('Command executed:', command.name, 'History index:', this.historyIndex);
+    }
+    
+    undo() {
+        if (this.historyIndex >= 0) {
+            const command = this.commandHistory[this.historyIndex];
+            command.undo();
+            this.historyIndex--;
+            
+            console.log('Undone:', command.name, 'New index:', this.historyIndex);
+            this.showToast(`Undone: ${command.name}`);
+            
+            // Re-render
+            if (this.canvasEngine) {
+                this.canvasEngine.render();
+            }
+        } else {
+            this.showToast('Nothing to undo');
+        }
+    }
+    
+    redo() {
+        if (this.historyIndex < this.commandHistory.length - 1) {
+            this.historyIndex++;
+            const command = this.commandHistory[this.historyIndex];
+            command.execute();
+            
+            console.log('Redone:', command.name, 'New index:', this.historyIndex);
+            this.showToast(`Redone: ${command.name}`);
+            
+            // Re-render
+            if (this.canvasEngine) {
+                this.canvasEngine.render();
+            }
+        } else {
+            this.showToast('Nothing to redo');
+        }
+    }
+    
+    // Command Classes
+    createAddNodeCommand(nodeData) {
+        return {
+            name: `Add Node: ${nodeData.label}`,
+            execute: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.addNode(nodeData);
+                    if (this.layerManager) {
+                        this.layerManager.updateStats();
+                    }
+                }
+            },
+            undo: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.removeNode(nodeData.id);
+                    if (this.layerManager) {
+                        this.layerManager.updateStats();
+                    }
+                }
+            }
+        };
+    }
+    
+    createRemoveNodeCommand(nodeId) {
+        const node = this.canvasEngine?.nodes.get(nodeId);
+        if (!node) return null;
+        
+        // Store node data and its connections for restoration
+        const nodeData = { ...node };
+        const connections = [];
+        
+        if (this.canvasEngine) {
+            this.canvasEngine.connections.forEach(conn => {
+                if (conn.from === nodeId || conn.to === nodeId) {
+                    connections.push({ ...conn });
+                }
+            });
+        }
+        
+        return {
+            name: `Remove Node: ${nodeData.label}`,
+            execute: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.removeNode(nodeId);
+                    if (this.layerManager) {
+                        this.layerManager.updateStats();
+                    }
+                }
+            },
+            undo: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.addNode(nodeData);
+                    connections.forEach(conn => {
+                        this.canvasEngine.addConnection(conn.from, conn.to);
+                    });
+                    if (this.layerManager) {
+                        this.layerManager.updateStats();
+                    }
+                }
+            }
+        };
+    }
+    
+    createAddConnectionCommand(fromId, toId) {
+        // Get node labels for the prompt
+        const fromNode = this.canvasEngine?.nodes.get(fromId);
+        const toNode = this.canvasEngine?.nodes.get(toId);
+        const fromLabel = fromNode?.label || fromId;
+        const toLabel = toNode?.label || toId;
+        
+        // Prompt for connection label
+        const label = prompt(`Enter connection label for:\n${fromLabel} → ${toLabel}`, '') || '';
+        
+        return {
+            name: `Add Connection: ${fromId} → ${toId}`,
+            execute: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.addConnection({
+                        from: fromId,
+                        to: toId,
+                        label: label
+                    });
+                }
+            },
+            undo: () => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.removeConnection(fromId, toId);
+                }
+            }
+        };
+    }
+    
+    createUpdateNodeCommand(nodeId, oldData, newData) {
+        return {
+            name: `Update Node: ${newData.label || oldData.label}`,
+            execute: () => {
+                const node = this.canvasEngine?.nodes.get(nodeId);
+                if (node) {
+                    Object.assign(node, newData);
+                    if (this.layerManager && newData.layer !== oldData.layer) {
+                        this.layerManager.updateStats();
+                    }
+                }
+            },
+            undo: () => {
+                const node = this.canvasEngine?.nodes.get(nodeId);
+                if (node) {
+                    Object.assign(node, oldData);
+                    if (this.layerManager && newData.layer !== oldData.layer) {
+                        this.layerManager.updateStats();
+                    }
+                }
+            }
+        };
+    }
+    
+    // Edit Node Modal Methods
+    showEditNodeModal(nodeId) {
+        const node = this.canvasEngine?.nodes.get(nodeId);
+        if (!node) {
+            console.error('Node not found:', nodeId);
+            return;
+        }
+        
+        // Populate form with current node data
+        document.getElementById('edit-node-id').value = nodeId;
+        document.getElementById('edit-node-label').value = node.label || '';
+        document.getElementById('edit-node-type').value = node.type || 'default';
+        document.getElementById('edit-node-description').value = node.description || '';
+        document.getElementById('edit-node-code').value = node.code || '';
+        
+        // Populate layer options
+        const layerSelect = document.getElementById('edit-node-layer');
+        layerSelect.innerHTML = '';
+        
+        if (this.layerManager) {
+            const layers = this.layerManager.getLayerData();
+            layers.forEach(layer => {
+                const option = document.createElement('option');
+                option.value = layer.id;
+                option.textContent = layer.name;
+                option.selected = layer.id === node.layer;
+                layerSelect.appendChild(option);
+            });
+        }
+        
+        // Set selected icon
+        const iconButtons = document.querySelectorAll('#edit-icon-selector .icon-btn');
+        iconButtons.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.icon === node.icon || (!node.icon && !btn.dataset.icon)) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Show modal
+        const modal = document.getElementById('edit-node-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            
+            // Focus on label field
+            setTimeout(() => {
+                document.getElementById('edit-node-label').focus();
+            }, 100);
+        }
+        
+        // Hide node details modal
+        this.hideModal();
+    }
+    
+    hideEditNodeModal() {
+        const modal = document.getElementById('edit-node-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    handleNodeEdit(e) {
+        e.preventDefault();
+        
+        const nodeId = document.getElementById('edit-node-id').value;
+        const label = document.getElementById('edit-node-label').value.trim();
+        const type = document.getElementById('edit-node-type').value;
+        const layer = document.getElementById('edit-node-layer').value;
+        const description = document.getElementById('edit-node-description').value.trim();
+        const code = document.getElementById('edit-node-code').value.trim();
+        
+        // Get selected icon
+        const selectedIcon = document.querySelector('#edit-icon-selector .icon-btn.active');
+        const icon = selectedIcon?.dataset.icon || '';
+        
+        if (!label) {
+            alert('Please enter a node label.');
+            return;
+        }
+        
+        // Update node
+        this.updateNode(nodeId, {
+            label,
+            type,
+            layer,
+            description,
+            code,
+            icon
+        });
+        
+        this.hideEditNodeModal();
+    }
+    
+    updateNode(nodeId, updates) {
+        const node = this.canvasEngine?.nodes.get(nodeId);
+        if (!node) {
+            console.error('Node not found:', nodeId);
+            return;
+        }
+        
+        // Store old data for undo
+        const oldData = { ...node };
+        
+        // Create and execute command
+        const command = this.createUpdateNodeCommand(nodeId, oldData, updates);
+        this.executeCommand(command);
+        
+        // Re-render canvas
+        if (this.canvasEngine) {
+            this.canvasEngine.render();
+        }
+        
+        console.log('Updated node:', nodeId, updates);
     }
 }
 
