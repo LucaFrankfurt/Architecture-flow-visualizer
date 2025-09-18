@@ -395,9 +395,20 @@ class LayerManager {
             const count = layerCounts.get(node.layer) || 0;
             layerCounts.set(node.layer, count + 1);
         }
-        
+
+        // Reset all layer counts to 0 first
+        for (const layer of this.layers.values()) {
+            layer.nodeCount = 0;
+        }
+
+        // Update counts for layers that have nodes
         for (const [layerId, count] of layerCounts) {
             this.updateNodeCount(layerId, count);
+        }
+
+        // Update all layer items to reflect new counts
+        for (const layerId of this.layers.keys()) {
+            this.updateLayerItem(layerId);
         }
     }
     

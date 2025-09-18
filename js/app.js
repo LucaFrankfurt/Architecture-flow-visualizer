@@ -1444,7 +1444,7 @@ class ArchitectureApp {
             version: '1.0.0',
             timestamp: new Date().toISOString(),
             nodes: Array.from(this.canvasEngine.nodes.values()),
-            connections: Array.from(this.canvasEngine.connections.values()),
+            connections: this.canvasEngine.connections,
             layers: this.layerManager ? this.layerManager.getLayerData() : [],
             viewport: this.canvasEngine.viewport ? { ...this.canvasEngine.viewport } : null
         };
@@ -1512,7 +1512,7 @@ class ArchitectureApp {
         // Import connections
         if (diagramData.connections && Array.isArray(diagramData.connections)) {
             diagramData.connections.forEach(connData => {
-                this.canvasEngine.addConnection(connData.from, connData.to);
+                this.canvasEngine.addConnection(connData);
             });
         }
         
@@ -1830,8 +1830,12 @@ class ArchitectureApp {
                 const node = this.canvasEngine?.nodes.get(nodeId);
                 if (node) {
                     Object.assign(node, newData);
-                    if (this.layerManager && newData.layer !== oldData.layer) {
+                    if (this.layerManager) {
                         this.layerManager.updateStats();
+                        // Also refresh the UI if layer changed
+                        if (newData.layer !== oldData.layer) {
+                            this.layerManager.updateUI();
+                        }
                     }
                 }
             },
@@ -1839,8 +1843,12 @@ class ArchitectureApp {
                 const node = this.canvasEngine?.nodes.get(nodeId);
                 if (node) {
                     Object.assign(node, oldData);
-                    if (this.layerManager && newData.layer !== oldData.layer) {
+                    if (this.layerManager) {
                         this.layerManager.updateStats();
+                        // Also refresh the UI if layer changed
+                        if (newData.layer !== oldData.layer) {
+                            this.layerManager.updateUI();
+                        }
                     }
                 }
             }
@@ -1953,6 +1961,12 @@ class ArchitectureApp {
         // Create and execute command
         const command = this.createUpdateNodeCommand(nodeId, oldData, updates);
         this.executeCommand(command);
+        
+        // Update layer manager if layer changed
+        if (this.layerManager && updates.layer && updates.layer !== oldData.layer) {
+            this.layerManager.updateStats();
+            this.layerManager.updateUI();
+        }
         
         // Re-render canvas
         if (this.canvasEngine) {
